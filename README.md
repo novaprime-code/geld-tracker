@@ -84,7 +84,11 @@ email reminders — all inside a free Google Spreadsheet.
 2. Click the gear icon ⚙️ and choose **Web app**.
 3. Fill in the settings:
    - **Execute as:** Me *(your Google account)*
-   - **Who has access:** Anyone with Google Account *(or Anyone for public access)*
+   - **Who has access:** Only myself *(default — safest for a personal finance app)*
+
+   > To share the app with other Google accounts, change `"access"` in
+   > `appsscript.json` from `"MYSELF"` to `"ANYONE"` (requires Google login)
+   > before deploying.
 4. Click **Deploy**.
 5. Copy the **Web app URL** — open it in your browser to use Geld-Tracker. 🎉
 
