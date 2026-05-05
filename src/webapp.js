@@ -30,7 +30,7 @@ function doGet(e) {
     .evaluate()
     .setTitle("💰 Geld-Tracker")
     .addMetaTag("viewport", "width=device-width, initial-scale=1")
-    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DEFAULT);
 }
 
 // ---------------------------------------------------------------------------
