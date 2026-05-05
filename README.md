@@ -70,22 +70,32 @@ email reminders — all inside a free Google Spreadsheet.
    | `summary.js` | `src/summary.js` |
    | `highlight.js` | `src/highlight.js` |
    | `goals.js` | `src/goals.js` |
+   | `webapp.js` | `src/webapp.js` |
+   | `index.html` | `src/index.html` |
 
    Also replace the contents of `appsscript.json` (click **Project Settings →
    Show "appsscript.json"**) with the `appsscript.json` from this repo.
 
 5. Click **Save** (💾).
 
-### 2 – Run the one-click setup
+### 2 – Deploy as a Web App
 
-1. In the Apps Script editor select the function **`setupSpreadsheet`**.
-2. Click **▶ Run**.
-3. Accept the required permissions when prompted.
-4. Switch back to your spreadsheet – all four sheets are now ready. 🎉
+1. In the Apps Script editor click **Deploy → New deployment**.
+2. Click the gear icon ⚙️ and choose **Web app**.
+3. Fill in the settings:
+   - **Execute as:** Me *(your Google account)*
+   - **Who has access:** Anyone with Google Account *(or Anyone for public access)*
+4. Click **Deploy**.
+5. Copy the **Web app URL** — open it in your browser to use Geld-Tracker. 🎉
 
-### 3 – Set up triggers
+> **First-time use:** After opening the web app, go to the **Actions** tab and
+> click **Run Setup** to create all four sheets in the spreadsheet automatically.
+> You do **not** need to run anything manually in the Apps Script editor.
 
-Go to **Extensions → Apps Script → Triggers (clock icon)** and add:
+### 3 – Set up time-driven triggers (optional)
+
+For fully automated background processing, go to
+**Extensions → Apps Script → Triggers (clock icon)** and add:
 
 | Function | Trigger type | Frequency |
 |----------|-------------|-----------|
@@ -93,6 +103,9 @@ Go to **Extensions → Apps Script → Triggers (clock icon)** and add:
 | `generateMonthlySummary` | Time-driven | Month timer · Day 1 |
 | `highlightUnnecessary` | Time-driven | Weekly · Sunday |
 | `updateGoals` | Time-driven | Daily · midnight |
+
+All of these functions can also be triggered manually from the web app's
+**Actions** tab at any time.
 
 ---
 
@@ -128,6 +141,13 @@ Go to **Extensions → Apps Script → Triggers (clock icon)** and add:
 ---
 
 ## ⚙️ Scripts overview
+
+### `doGet()` / server-side API — `src/webapp.js`
+
+Web App entry point. `doGet()` serves the `index.html` single-page UI.
+All other exported functions (`getExpenses`, `addExpense`, `getGoals`, etc.)
+are callable from the browser via `google.script.run` and act as the REST-like
+backend for the web app.
 
 ### `setupSpreadsheet()` — `src/setup.js`
 

@@ -1,0 +1,1097 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>💰 Geld-Tracker</title>
+  <!-- Bootstrap 5 -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <!-- Bootstrap Icons -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
+  <style>
+    :root {
+      --gt-blue:   #4A90D9;
+      --gt-green:  #34A853;
+      --gt-yellow: #FBBC04;
+      --gt-red:    #EA4335;
+    }
+    body { background: #f4f6f9; font-size: 0.9rem; }
+
+    /* Navbar */
+    .gt-navbar { background: var(--gt-blue) !important; }
+
+    /* Tab nav */
+    .nav-tabs .nav-link        { color: #495057; }
+    .nav-tabs .nav-link.active { background: var(--gt-blue); color: #fff; border-color: var(--gt-blue) var(--gt-blue) #fff; }
+    .nav-tabs .nav-link:hover:not(.active) { background: #e9ecef; }
+
+    /* Summary cards */
+    .card-expense  { border-left: 4px solid var(--gt-red); }
+    .card-income   { border-left: 4px solid var(--gt-green); }
+    .card-savings  { border-left: 4px solid var(--gt-blue); }
+    .card-loans    { border-left: 4px solid var(--gt-yellow); }
+
+    /* Badges */
+    .badge-yes       { background: #d4edda; color: #155724; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; }
+    .badge-no        { background: #f8d7da; color: #721c24; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; }
+    .badge-pending   { background: #fff3cd; color: #856404; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; }
+    .badge-returned  { background: #d4edda; color: #155724; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; }
+
+    /* Loading overlay */
+    #loadingOverlay {
+      position: fixed; inset: 0;
+      background: rgba(255,255,255,0.88);
+      z-index: 9999;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 0.75rem;
+    }
+
+    /* Toast container */
+    #toastContainer { position: fixed; bottom: 1.2rem; right: 1.2rem; z-index: 9998; min-width: 260px; }
+
+    /* Table tweaks */
+    .table > :not(caption) > * > * { padding: 0.45rem 0.6rem; }
+    .table tbody tr:hover { background: #f0f4ff; }
+
+    /* Action card min-width button */
+    .action-btn { min-width: 200px; }
+
+    /* Tab content top padding */
+    .tab-pane { padding-top: 1.25rem; }
+
+    /* Scrollable table body */
+    .scrollable { max-height: 62vh; overflow-y: auto; }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════ LOADING ════════════════════════════════ -->
+<div id="loadingOverlay">
+  <div class="spinner-border text-primary" style="width:2.5rem;height:2.5rem;" role="status"></div>
+  <div class="text-muted fw-semibold">Loading Geld-Tracker…</div>
+</div>
+
+<!-- ═══════════════════════════════ NAVBAR ════════════════════════════════ -->
+<nav class="navbar gt-navbar py-2 px-3">
+  <span class="navbar-brand text-white fw-bold fs-5 mb-0">💰 Geld-Tracker</span>
+  <div class="d-flex align-items-center gap-3">
+    <a id="sheetLink" href="#" target="_blank" class="btn btn-sm btn-light">
+      <i class="bi bi-table"></i> Open Spreadsheet
+    </a>
+    <span id="userEmail" class="text-white opacity-75 small d-none d-md-inline"></span>
+  </div>
+</nav>
+
+<!-- ═══════════════════════════════ MAIN ══════════════════════════════════ -->
+<div class="container-fluid px-3 pt-3">
+
+  <!-- Tab navigation -->
+  <ul class="nav nav-tabs flex-nowrap overflow-auto" id="mainTabs" role="tablist">
+    <li class="nav-item">
+      <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-dashboard">
+        <i class="bi bi-speedometer2"></i> Dashboard
+      </button>
+    </li>
+    <li class="nav-item">
+      <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-expenses">
+        <i class="bi bi-receipt"></i> Expenses
+      </button>
+    </li>
+    <li class="nav-item">
+      <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-summary">
+        <i class="bi bi-calendar3"></i> Monthly Summary
+      </button>
+    </li>
+    <li class="nav-item">
+      <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-goals">
+        <i class="bi bi-bullseye"></i> Goals
+      </button>
+    </li>
+    <li class="nav-item">
+      <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-loans">
+        <i class="bi bi-person-check"></i> Loans
+      </button>
+    </li>
+    <li class="nav-item">
+      <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-actions">
+        <i class="bi bi-gear"></i> Actions
+      </button>
+    </li>
+  </ul>
+
+  <!-- Tab content -->
+  <div class="tab-content">
+
+    <!-- ══════════════════════ DASHBOARD ══════════════════════ -->
+    <div class="tab-pane fade show active" id="tab-dashboard">
+
+      <!-- Summary cards -->
+      <div class="row g-3 mb-3" id="dashCards"></div>
+
+      <!-- Recent expenses + Goal progress -->
+      <div class="row g-3">
+        <div class="col-lg-8">
+          <div class="card shadow-sm">
+            <div class="card-header fw-semibold py-2">
+              <i class="bi bi-clock-history"></i> Recent Expenses (last 10)
+            </div>
+            <div class="table-responsive">
+              <table class="table table-hover mb-0">
+                <thead class="table-light">
+                  <tr>
+                    <th>Date</th><th>Category</th><th>Amount</th>
+                    <th>Method</th><th>Necessary?</th>
+                  </tr>
+                </thead>
+                <tbody id="recentExpBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-lg-4">
+          <div class="card shadow-sm h-100">
+            <div class="card-header fw-semibold py-2">
+              <i class="bi bi-bullseye"></i> Goal Progress
+            </div>
+            <div class="card-body" id="dashGoalProgress"></div>
+          </div>
+        </div>
+      </div>
+    </div><!-- /dashboard -->
+
+    <!-- ══════════════════════ EXPENSES ══════════════════════ -->
+    <div class="tab-pane fade" id="tab-expenses">
+      <div class="row g-3">
+
+        <!-- Add Expense form -->
+        <div class="col-lg-4">
+          <div class="card shadow-sm">
+            <div class="card-header fw-semibold py-2 text-success">
+              <i class="bi bi-plus-circle-fill"></i> Add Expense
+            </div>
+            <div class="card-body">
+              <form id="expenseForm" onsubmit="submitExpense(event)">
+                <div class="mb-2">
+                  <label class="form-label small mb-1">Date <span class="text-danger">*</span></label>
+                  <input type="date" class="form-control form-control-sm" id="exp-date" required />
+                </div>
+                <div class="mb-2">
+                  <label class="form-label small mb-1">Category <span class="text-danger">*</span></label>
+                  <select class="form-select form-select-sm" id="exp-category" required>
+                    <option value="">Select…</option>
+                    <option>Personal</option>
+                    <option>Household</option>
+                    <option>Education</option>
+                    <option>Test</option>
+                    <option>Loan</option>
+                    <option>Transport</option>
+                    <option>Food</option>
+                  </select>
+                </div>
+                <div class="mb-2">
+                  <label class="form-label small mb-1">Subcategory</label>
+                  <input type="text" class="form-control form-control-sm" id="exp-subcategory" placeholder="Optional" />
+                </div>
+                <div class="mb-2">
+                  <label class="form-label small mb-1">Amount (₹) <span class="text-danger">*</span></label>
+                  <input type="number" class="form-control form-control-sm" id="exp-amount"
+                         min="0" step="0.01" required />
+                </div>
+                <div class="mb-2">
+                  <label class="form-label small mb-1">Payment Method <span class="text-danger">*</span></label>
+                  <select class="form-select form-select-sm" id="exp-method" required>
+                    <option value="">Select…</option>
+                    <option>Cash</option>
+                    <option>UPI</option>
+                    <option>Credit Card</option>
+                    <option>Debit Card</option>
+                    <option>Net Banking</option>
+                  </select>
+                </div>
+                <div class="mb-2">
+                  <label class="form-label small mb-1">Necessary?</label>
+                  <select class="form-select form-select-sm" id="exp-necessary">
+                    <option value="Yes">Yes</option>
+                    <option value="No">No</option>
+                  </select>
+                </div>
+                <div class="mb-3">
+                  <label class="form-label small mb-1">Notes</label>
+                  <input type="text" class="form-control form-control-sm" id="exp-notes" placeholder="Optional" />
+                </div>
+                <button type="submit" class="btn btn-primary btn-sm w-100" id="expSubmitBtn">
+                  <i class="bi bi-plus"></i> Add Expense
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+
+        <!-- Expenses table -->
+        <div class="col-lg-8">
+          <div class="card shadow-sm">
+            <div class="card-header d-flex justify-content-between align-items-center py-2">
+              <span class="fw-semibold"><i class="bi bi-list-ul"></i> All Expenses</span>
+              <div class="d-flex gap-2 align-items-center">
+                <input type="month" id="expFilterMonth" class="form-control form-control-sm"
+                       style="width:155px" title="Filter by month" />
+                <button class="btn btn-sm btn-outline-secondary" onclick="loadExpenses()" title="Refresh">
+                  <i class="bi bi-arrow-clockwise"></i>
+                </button>
+              </div>
+            </div>
+            <div class="scrollable">
+              <table class="table table-hover table-sm mb-0">
+                <thead class="table-light sticky-top">
+                  <tr>
+                    <th>Date</th><th>Category</th><th>Subcategory</th>
+                    <th>Amount</th><th>Method</th><th>Necessary?</th>
+                    <th>Notes</th><th></th>
+                  </tr>
+                </thead>
+                <tbody id="expBody"></tbody>
+              </table>
+            </div>
+            <div class="card-footer text-muted small d-flex justify-content-between py-1">
+              <span id="expCount">0 records</span>
+              <span id="expTotal">Total: ₹0.00</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div><!-- /expenses -->
+
+    <!-- ══════════════════════ MONTHLY SUMMARY ══════════════════════ -->
+    <div class="tab-pane fade" id="tab-summary">
+      <div class="card shadow-sm">
+        <div class="card-header d-flex justify-content-between align-items-center py-2">
+          <span class="fw-semibold"><i class="bi bi-calendar3"></i> Monthly Summary</span>
+          <button class="btn btn-sm btn-outline-secondary" onclick="loadSummary()">
+            <i class="bi bi-arrow-clockwise"></i> Refresh
+          </button>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-hover mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>Month</th>
+                <th>Total Income</th>
+                <th>Total Expense</th>
+                <th>Savings</th>
+                <th>Savings %</th>
+                <th>Edit Income</th>
+              </tr>
+            </thead>
+            <tbody id="summaryBody"></tbody>
+          </table>
+        </div>
+      </div>
+      <p class="text-muted small mt-2">
+        <i class="bi bi-info-circle"></i>
+        Click <i class="bi bi-pencil"></i> to update income for any month.
+        Expense totals are refreshed via <strong>Actions → Generate Monthly Summary</strong>.
+      </p>
+    </div><!-- /summary -->
+
+    <!-- ══════════════════════ GOALS ══════════════════════ -->
+    <div class="tab-pane fade" id="tab-goals">
+      <div class="row g-3">
+
+        <!-- Add Goal form -->
+        <div class="col-lg-4">
+          <div class="card shadow-sm">
+            <div class="card-header fw-semibold py-2" style="color: #856404">
+              <i class="bi bi-plus-circle-fill"></i> Add Goal
+            </div>
+            <div class="card-body">
+              <form id="goalForm" onsubmit="submitGoal(event)">
+                <div class="mb-2">
+                  <label class="form-label small mb-1">Goal Name <span class="text-danger">*</span></label>
+                  <input type="text" class="form-control form-control-sm" id="goal-name"
+                         required placeholder="e.g. Emergency Fund" />
+                </div>
+                <div class="mb-2">
+                  <label class="form-label small mb-1">Target Amount (₹) <span class="text-danger">*</span></label>
+                  <input type="number" class="form-control form-control-sm" id="goal-target"
+                         min="0" step="0.01" required />
+                </div>
+                <div class="mb-3">
+                  <label class="form-label small mb-1">Deadline</label>
+                  <input type="date" class="form-control form-control-sm" id="goal-deadline" />
+                </div>
+                <button type="submit" class="btn btn-warning btn-sm w-100 text-dark" id="goalSubmitBtn">
+                  <i class="bi bi-plus"></i> Add Goal
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+
+        <!-- Goals list -->
+        <div class="col-lg-8">
+          <div class="card shadow-sm">
+            <div class="card-header d-flex justify-content-between align-items-center py-2">
+              <span class="fw-semibold"><i class="bi bi-bullseye"></i> Savings Goals</span>
+              <button class="btn btn-sm btn-outline-secondary" onclick="loadGoals()">
+                <i class="bi bi-arrow-clockwise"></i>
+              </button>
+            </div>
+            <div class="card-body" id="goalsBody"></div>
+          </div>
+        </div>
+
+      </div>
+    </div><!-- /goals -->
+
+    <!-- ══════════════════════ LOANS ══════════════════════ -->
+    <div class="tab-pane fade" id="tab-loans">
+      <div class="row g-3">
+
+        <!-- Add Loan form -->
+        <div class="col-lg-4">
+          <div class="card shadow-sm">
+            <div class="card-header fw-semibold py-2 text-danger">
+              <i class="bi bi-plus-circle-fill"></i> Add Loan
+            </div>
+            <div class="card-body">
+              <form id="loanForm" onsubmit="submitLoan(event)">
+                <div class="mb-2">
+                  <label class="form-label small mb-1">Person <span class="text-danger">*</span></label>
+                  <input type="text" class="form-control form-control-sm" id="loan-person" required />
+                </div>
+                <div class="mb-2">
+                  <label class="form-label small mb-1">Amount (₹) <span class="text-danger">*</span></label>
+                  <input type="number" class="form-control form-control-sm" id="loan-amount"
+                         min="0" step="0.01" required />
+                </div>
+                <div class="mb-2">
+                  <label class="form-label small mb-1">Given Date</label>
+                  <input type="date" class="form-control form-control-sm" id="loan-givenDate" />
+                </div>
+                <div class="mb-2">
+                  <label class="form-label small mb-1">Expected Return Date</label>
+                  <input type="date" class="form-control form-control-sm" id="loan-returnDate" />
+                </div>
+                <div class="mb-3">
+                  <label class="form-label small mb-1">Status</label>
+                  <select class="form-select form-select-sm" id="loan-status">
+                    <option value="Pending">Pending</option>
+                    <option value="Returned">Returned</option>
+                  </select>
+                </div>
+                <button type="submit" class="btn btn-danger btn-sm w-100" id="loanSubmitBtn">
+                  <i class="bi bi-plus"></i> Add Loan
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+
+        <!-- Loans table -->
+        <div class="col-lg-8">
+          <div class="card shadow-sm">
+            <div class="card-header d-flex justify-content-between align-items-center py-2">
+              <span class="fw-semibold"><i class="bi bi-person-check"></i> Loans</span>
+              <button class="btn btn-sm btn-outline-secondary" onclick="loadLoans()">
+                <i class="bi bi-arrow-clockwise"></i>
+              </button>
+            </div>
+            <div class="table-responsive">
+              <table class="table table-hover mb-0">
+                <thead class="table-light">
+                  <tr>
+                    <th>Person</th><th>Amount</th><th>Given</th>
+                    <th>Return By</th><th>Status</th><th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="loansBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div><!-- /loans -->
+
+    <!-- ══════════════════════ ACTIONS ══════════════════════ -->
+    <div class="tab-pane fade" id="tab-actions">
+      <div class="row g-3">
+
+        <div class="col-sm-6 col-xl-4">
+          <div class="card shadow-sm h-100">
+            <div class="card-body text-center py-4">
+              <i class="bi bi-wrench-adjustable fs-2 text-primary mb-2 d-block"></i>
+              <h6 class="fw-semibold">Setup Spreadsheet</h6>
+              <p class="text-muted small">
+                Creates all 4 sheets (Expenses, Monthly_Summary, Goals, Loans) with
+                headers, dropdowns and formulas. Run once on a fresh spreadsheet.
+              </p>
+              <button class="btn btn-primary action-btn" onclick="runAction('runSetup', this)">
+                <i class="bi bi-play-fill"></i> Run Setup
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-sm-6 col-xl-4">
+          <div class="card shadow-sm h-100">
+            <div class="card-body text-center py-4">
+              <i class="bi bi-bar-chart-fill fs-2 text-success mb-2 d-block"></i>
+              <h6 class="fw-semibold">Generate Monthly Summary</h6>
+              <p class="text-muted small">
+                Totals the current month's expenses from the Expenses sheet and
+                writes the result to Monthly_Summary.
+              </p>
+              <button class="btn btn-success action-btn" onclick="runAction('runGenerateMonthlySummary', this)">
+                <i class="bi bi-play-fill"></i> Generate Summary
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-sm-6 col-xl-4">
+          <div class="card shadow-sm h-100">
+            <div class="card-body text-center py-4">
+              <i class="bi bi-palette-fill fs-2 text-danger mb-2 d-block"></i>
+              <h6 class="fw-semibold">Highlight Unnecessary</h6>
+              <p class="text-muted small">
+                Colours every "Necessary? = No" expense row in light red inside
+                the spreadsheet.
+              </p>
+              <button class="btn btn-danger action-btn" onclick="runAction('runHighlightUnnecessary', this)">
+                <i class="bi bi-play-fill"></i> Highlight
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-sm-6 col-xl-4">
+          <div class="card shadow-sm h-100">
+            <div class="card-body text-center py-4">
+              <i class="bi bi-bullseye fs-2 text-warning mb-2 d-block"></i>
+              <h6 class="fw-semibold">Update Goal Progress</h6>
+              <p class="text-muted small">
+                Recalculates saved amounts for every goal by matching expenses
+                to goal names (Category / Subcategory).
+              </p>
+              <button class="btn btn-warning action-btn text-dark" onclick="runAction('runUpdateGoals', this)">
+                <i class="bi bi-play-fill"></i> Update Goals
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-sm-6 col-xl-4">
+          <div class="card shadow-sm h-100">
+            <div class="card-body text-center py-4">
+              <i class="bi bi-envelope-fill fs-2 text-info mb-2 d-block"></i>
+              <h6 class="fw-semibold">Send Daily Reminder</h6>
+              <p class="text-muted small">
+                Sends the daily expense-logging reminder email to your Gmail
+                account right now.
+              </p>
+              <button class="btn btn-info action-btn text-dark" onclick="runAction('runSendReminder', this)">
+                <i class="bi bi-play-fill"></i> Send Reminder
+              </button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div><!-- /actions -->
+
+  </div><!-- /tab-content -->
+</div><!-- /container-fluid -->
+
+<!-- ═══════════════════════ TOAST CONTAINER ════════════════════════════════ -->
+<div id="toastContainer"></div>
+
+<!-- Bootstrap JS bundle -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════════════
+// State
+// ═══════════════════════════════════════════════════════════════════════════
+var _state = { expenses: [], summary: [], goals: [], loans: [] };
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Utility helpers
+// ═══════════════════════════════════════════════════════════════════════════
+function fmt(n) {
+  return "₹" + (Number(n) || 0).toLocaleString("en-IN", {
+    minimumFractionDigits: 2, maximumFractionDigits: 2
+  });
+}
+
+function fmtPct(n) {
+  return (Number(n) || 0).toFixed(1) + "%";
+}
+
+function todayStr() {
+  return new Date().toISOString().substring(0, 10);
+}
+
+function currentMonthStr() {
+  return new Date().toISOString().substring(0, 7);
+}
+
+function escHtml(s) {
+  return String(s || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+// Show / hide the full-screen loading overlay
+function showLoading(visible) {
+  document.getElementById("loadingOverlay").style.display = visible ? "flex" : "none";
+}
+
+// Bottom-right toast notification
+function showToast(msg, type) {
+  var id = "t" + Date.now();
+  var bgCls = type === "success" ? "bg-success"
+            : type === "warning" ? "bg-warning text-dark"
+            : "bg-danger";
+  document.getElementById("toastContainer").insertAdjacentHTML(
+    "beforeend",
+    '<div id="' + id + '" class="toast align-items-center text-white ' + bgCls + ' border-0 mb-2" role="alert">' +
+      '<div class="d-flex">' +
+        '<div class="toast-body">' + escHtml(msg) + '</div>' +
+        '<button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>' +
+      '</div>' +
+    '</div>'
+  );
+  var el = document.getElementById(id);
+  var toast = new bootstrap.Toast(el, { delay: 4500 });
+  toast.show();
+  el.addEventListener("hidden.bs.toast", function () { el.remove(); });
+}
+
+// Spinner helper: disable button and show spinner while async call runs
+function setBtnLoading(btn, loading, originalHtml) {
+  if (loading) {
+    btn._origHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Please wait…';
+  } else {
+    btn.disabled = false;
+    btn.innerHTML = originalHtml !== undefined ? originalHtml : (btn._origHtml || btn.innerHTML);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Initialisation
+// ═══════════════════════════════════════════════════════════════════════════
+window.addEventListener("load", function () {
+  // Pre-fill today's date in the expense form
+  document.getElementById("exp-date").value = todayStr();
+  // Pre-fill current month in the filter
+  document.getElementById("expFilterMonth").value = currentMonthStr();
+  // Wire up the month filter change
+  document.getElementById("expFilterMonth").addEventListener("change", renderExpenses);
+
+  // Fetch meta info (email + spreadsheet URL)
+  google.script.run
+    .withSuccessHandler(function (meta) {
+      if (!meta) return;
+      if (meta.email) {
+        var el = document.getElementById("userEmail");
+        el.textContent = meta.email;
+        el.classList.remove("d-none");
+      }
+      if (meta.spreadsheetUrl) {
+        document.getElementById("sheetLink").href = meta.spreadsheetUrl;
+      }
+    })
+    .getMetaInfo();
+
+  // Load all data sections in parallel
+  loadAll();
+});
+
+// Loads all four data sections, then hides the loading overlay
+function loadAll() {
+  showLoading(true);
+  var done = 0;
+  var total = 4;
+  function tick() {
+    done++;
+    if (done >= total) {
+      showLoading(false);
+      renderDashboard();
+    }
+  }
+
+  google.script.run
+    .withSuccessHandler(function (r) { if (r && !r.error) _state.expenses = r; tick(); })
+    .withFailureHandler(tick)
+    .getExpenses();
+
+  google.script.run
+    .withSuccessHandler(function (r) { if (r && !r.error) _state.summary = r; tick(); })
+    .withFailureHandler(tick)
+    .getMonthlySummary();
+
+  google.script.run
+    .withSuccessHandler(function (r) { if (r && !r.error) _state.goals = r; tick(); })
+    .withFailureHandler(tick)
+    .getGoals();
+
+  google.script.run
+    .withSuccessHandler(function (r) { if (r && !r.error) _state.loans = r; tick(); })
+    .withFailureHandler(tick)
+    .getLoans();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Dashboard
+// ═══════════════════════════════════════════════════════════════════════════
+function renderDashboard() {
+  var cm = currentMonthStr();
+
+  // Current-month stats
+  var cmExp = _state.expenses.filter(function (e) {
+    return e.date && e.date.substring(0, 7) === cm;
+  });
+  var cmTotal = cmExp.reduce(function (s, e) { return s + e.amount; }, 0);
+
+  var cmSummary = _state.summary.find(function (s) { return s.month === cm; });
+  var cmIncome  = cmSummary ? cmSummary.income  : 0;
+  var cmSavings = cmSummary ? cmSummary.savings  : cmIncome - cmTotal;
+
+  var pendingLoans = _state.loans.filter(function (l) { return l.status === "Pending"; });
+  var pendingTotal = pendingLoans.reduce(function (s, l) { return s + l.amount; }, 0);
+
+  // Summary cards
+  document.getElementById("dashCards").innerHTML = [
+    _summaryCard("This Month Expenses", fmt(cmTotal),  "bi-cart3",      "card-expense",  cm),
+    _summaryCard("This Month Income",   fmt(cmIncome), "bi-cash-stack", "card-income",   cm),
+    _summaryCard("This Month Savings",  fmt(cmSavings),"bi-piggy-bank", "card-savings",  ""),
+    _summaryCard("Pending Loans",       fmt(pendingTotal), "bi-person-check", "card-loans",
+                 pendingLoans.length + " loan(s)"),
+  ].join("");
+
+  // Recent expenses (last 10, sorted newest first)
+  var recent = _state.expenses.slice()
+    .sort(function (a, b) { return b.date.localeCompare(a.date); })
+    .slice(0, 10);
+
+  document.getElementById("recentExpBody").innerHTML = recent.length
+    ? recent.map(function (e) {
+        return "<tr>" +
+          "<td>" + escHtml(e.date) + "</td>" +
+          "<td><span class='badge bg-secondary'>" + escHtml(e.category) + "</span></td>" +
+          "<td>" + fmt(e.amount) + "</td>" +
+          "<td>" + escHtml(e.paymentMethod) + "</td>" +
+          "<td><span class='" + (e.necessary === "No" ? "badge-no" : "badge-yes") + "'>" +
+            escHtml(e.necessary) + "</span></td>" +
+          "</tr>";
+      }).join("")
+    : "<tr><td colspan='5' class='text-center text-muted py-3'>No expenses yet</td></tr>";
+
+  // Goal progress widgets
+  var goalsHtml = _state.goals.length
+    ? _state.goals.map(function (g) {
+        var pct   = g.target > 0 ? Math.min(100, Math.round((g.saved / g.target) * 100)) : 0;
+        var color = pct >= 100 ? "bg-success" : pct >= 50 ? "bg-primary" : "bg-warning";
+        return "<div class='mb-3'>" +
+          "<div class='d-flex justify-content-between'>" +
+            "<span class='small fw-semibold'>" + escHtml(g.name) + "</span>" +
+            "<span class='small text-muted'>" + pct + "%</span>" +
+          "</div>" +
+          "<div class='progress' style='height:7px'>" +
+            "<div class='progress-bar " + color + "' style='width:" + pct + "%'></div>" +
+          "</div>" +
+          "<div class='d-flex justify-content-between' style='font-size:0.72rem;color:#888;margin-top:2px'>" +
+            "<span>" + fmt(g.saved) + " saved</span>" +
+            "<span>Target: " + fmt(g.target) + "</span>" +
+          "</div>" +
+        "</div>";
+      }).join("")
+    : "<p class='text-muted small'>No goals yet. Add them in the Goals tab.</p>";
+
+  document.getElementById("dashGoalProgress").innerHTML = goalsHtml;
+
+  // Render all other sections so they are ready when the user switches tabs
+  renderExpenses();
+  renderSummary();
+  renderGoals();
+  renderLoans();
+}
+
+function _summaryCard(title, value, icon, cls, sub) {
+  return "<div class='col-sm-6 col-xl-3'>" +
+    "<div class='card shadow-sm " + cls + "'>" +
+    "<div class='card-body'>" +
+    "<div class='d-flex justify-content-between align-items-start'>" +
+    "<div>" +
+      "<div class='text-muted small'>" + title + "</div>" +
+      "<div class='fs-5 fw-bold mt-1'>" + value + "</div>" +
+      (sub ? "<div class='text-muted small'>" + escHtml(sub) + "</div>" : "") +
+    "</div>" +
+    "<i class='bi " + icon + " fs-2 text-muted opacity-50'></i>" +
+    "</div></div></div></div>";
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Expenses
+// ═══════════════════════════════════════════════════════════════════════════
+function loadExpenses() {
+  google.script.run
+    .withSuccessHandler(function (r) {
+      if (!r || r.error) { showToast(r ? r.error : "Failed to load expenses", "danger"); return; }
+      _state.expenses = r;
+      renderExpenses();
+    })
+    .withFailureHandler(function (e) { showToast("Error: " + e.message, "danger"); })
+    .getExpenses();
+}
+
+function renderExpenses() {
+  var filterMonth = document.getElementById("expFilterMonth").value;
+  var rows = filterMonth
+    ? _state.expenses.filter(function (e) {
+        return e.date && e.date.substring(0, 7) === filterMonth;
+      })
+    : _state.expenses;
+
+  var total = rows.reduce(function (s, e) { return s + e.amount; }, 0);
+  document.getElementById("expCount").textContent = rows.length + " record(s)";
+  document.getElementById("expTotal").textContent  = "Total: " + fmt(total);
+
+  var sorted = rows.slice().sort(function (a, b) { return b.date.localeCompare(a.date); });
+
+  document.getElementById("expBody").innerHTML = sorted.length
+    ? sorted.map(function (e) {
+        return "<tr class='" + (e.necessary === "No" ? "table-danger" : "") + "'>" +
+          "<td>" + escHtml(e.date) + "</td>" +
+          "<td>" + escHtml(e.category) + "</td>" +
+          "<td>" + escHtml(e.subcategory) + "</td>" +
+          "<td>" + fmt(e.amount) + "</td>" +
+          "<td>" + escHtml(e.paymentMethod) + "</td>" +
+          "<td><span class='" + (e.necessary === "No" ? "badge-no" : "badge-yes") + "'>" +
+            escHtml(e.necessary) + "</span></td>" +
+          "<td class='text-truncate' style='max-width:110px' title='" + escHtml(e.notes) + "'>" +
+            escHtml(e.notes) + "</td>" +
+          "<td>" +
+            "<button class='btn btn-sm btn-outline-danger py-0 px-1' " +
+              "onclick='deleteExpenseRow(" + e.rowIndex + ")' title='Delete'>" +
+              "<i class='bi bi-trash3'></i>" +
+            "</button>" +
+          "</td>" +
+          "</tr>";
+      }).join("")
+    : "<tr><td colspan='8' class='text-center text-muted py-3'>No expenses found</td></tr>";
+}
+
+function submitExpense(evt) {
+  evt.preventDefault();
+  var btn = document.getElementById("expSubmitBtn");
+  setBtnLoading(btn, true);
+
+  var data = {
+    date:          document.getElementById("exp-date").value,
+    category:      document.getElementById("exp-category").value,
+    subcategory:   document.getElementById("exp-subcategory").value,
+    amount:        document.getElementById("exp-amount").value,
+    paymentMethod: document.getElementById("exp-method").value,
+    necessary:     document.getElementById("exp-necessary").value,
+    notes:         document.getElementById("exp-notes").value,
+  };
+
+  google.script.run
+    .withSuccessHandler(function (r) {
+      setBtnLoading(btn, false, '<i class="bi bi-plus"></i> Add Expense');
+      if (r && r.error) { showToast(r.error, "danger"); return; }
+      showToast("Expense added!", "success");
+      document.getElementById("expenseForm").reset();
+      document.getElementById("exp-date").value = todayStr();
+      loadExpenses();
+    })
+    .withFailureHandler(function (e) {
+      setBtnLoading(btn, false, '<i class="bi bi-plus"></i> Add Expense');
+      showToast("Error: " + e.message, "danger");
+    })
+    .addExpense(data);
+}
+
+function deleteExpenseRow(rowIndex) {
+  if (!confirm("Delete this expense?")) return;
+  google.script.run
+    .withSuccessHandler(function (r) {
+      if (r && r.error) { showToast(r.error, "danger"); return; }
+      showToast("Expense deleted.", "success");
+      loadExpenses();
+    })
+    .withFailureHandler(function (e) { showToast("Error: " + e.message, "danger"); })
+    .deleteExpense(rowIndex);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Monthly Summary
+// ═══════════════════════════════════════════════════════════════════════════
+function loadSummary() {
+  google.script.run
+    .withSuccessHandler(function (r) {
+      if (!r || r.error) { showToast(r ? r.error : "Failed to load summary", "danger"); return; }
+      _state.summary = r;
+      renderSummary();
+    })
+    .withFailureHandler(function (e) { showToast("Error: " + e.message, "danger"); })
+    .getMonthlySummary();
+}
+
+function renderSummary() {
+  document.getElementById("summaryBody").innerHTML = _state.summary.length
+    ? _state.summary.map(function (s) {
+        var savColor = s.savings >= 0 ? "text-success fw-semibold" : "text-danger fw-semibold";
+        return "<tr>" +
+          "<td class='fw-semibold'>" + escHtml(s.month) + "</td>" +
+          "<td>" + fmt(s.income) + "</td>" +
+          "<td>" + fmt(s.expense) + "</td>" +
+          "<td class='" + savColor + "'>" + fmt(s.savings) + "</td>" +
+          "<td>" + fmtPct(s.savingsPct) + "</td>" +
+          "<td>" +
+            "<button class='btn btn-sm btn-outline-primary py-0 px-1' " +
+              "onclick='editIncome(" + s.rowIndex + "," + s.income + ",\"" + escHtml(s.month) + "\")' " +
+              "title='Edit income'>" +
+              "<i class='bi bi-pencil'></i>" +
+            "</button>" +
+          "</td>" +
+          "</tr>";
+      }).join("")
+    : "<tr><td colspan='6' class='text-center text-muted py-3'>No data. Run Setup first.</td></tr>";
+}
+
+function editIncome(rowIndex, currentIncome, month) {
+  var val = prompt("Enter total income for " + month + ":", currentIncome);
+  if (val === null) return;
+  var num = parseFloat(val);
+  if (isNaN(num) || num < 0) { showToast("Invalid amount.", "warning"); return; }
+  google.script.run
+    .withSuccessHandler(function (r) {
+      if (r && r.error) { showToast(r.error, "danger"); return; }
+      showToast("Income updated for " + month + "!", "success");
+      loadSummary();
+    })
+    .withFailureHandler(function (e) { showToast("Error: " + e.message, "danger"); })
+    .updateMonthlyIncome(rowIndex, num);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Goals
+// ═══════════════════════════════════════════════════════════════════════════
+function loadGoals() {
+  google.script.run
+    .withSuccessHandler(function (r) {
+      if (!r || r.error) { showToast(r ? r.error : "Failed to load goals", "danger"); return; }
+      _state.goals = r;
+      renderGoals();
+    })
+    .withFailureHandler(function (e) { showToast("Error: " + e.message, "danger"); })
+    .getGoals();
+}
+
+function renderGoals() {
+  var container = document.getElementById("goalsBody");
+
+  if (!_state.goals.length) {
+    container.innerHTML = "<p class='text-muted'>No goals yet. Add your first goal!</p>";
+    return;
+  }
+
+  container.innerHTML = _state.goals.map(function (g) {
+    var pct   = g.target > 0 ? Math.min(100, Math.round((g.saved / g.target) * 100)) : 0;
+    var color = pct >= 100 ? "bg-success" : pct >= 50 ? "bg-primary" : "bg-warning";
+    var badge = pct >= 100
+      ? "<span class='badge bg-success ms-2' style='font-size:0.7rem'>✅ Completed</span>"
+      : "";
+
+    return "<div class='card mb-3 shadow-sm'>" +
+      "<div class='card-body'>" +
+        "<div class='d-flex justify-content-between align-items-start'>" +
+          "<div>" +
+            "<h6 class='fw-semibold mb-0'>" + escHtml(g.name) + badge + "</h6>" +
+            (g.deadline
+              ? "<small class='text-muted'>Deadline: " + escHtml(g.deadline) + "</small>"
+              : "") +
+          "</div>" +
+          "<button class='btn btn-sm btn-outline-danger py-0 px-1' " +
+            "onclick='deleteGoalRow(" + g.rowIndex + ")' title='Delete goal'>" +
+            "<i class='bi bi-trash3'></i>" +
+          "</button>" +
+        "</div>" +
+        "<div class='progress my-2' style='height:10px'>" +
+          "<div class='progress-bar " + color + "' style='width:" + pct + "%'></div>" +
+        "</div>" +
+        "<div class='d-flex justify-content-between small text-muted'>" +
+          "<span>Saved: <strong>" + fmt(g.saved) + "</strong></span>" +
+          "<span>Target: <strong>" + fmt(g.target) + "</strong></span>" +
+          "<span>Remaining: <strong>" + fmt(g.remaining) + "</strong></span>" +
+          "<span><strong>" + pct + "%</strong></span>" +
+        "</div>" +
+      "</div></div>";
+  }).join("");
+}
+
+function submitGoal(evt) {
+  evt.preventDefault();
+  var btn = document.getElementById("goalSubmitBtn");
+  setBtnLoading(btn, true);
+
+  var data = {
+    name:     document.getElementById("goal-name").value,
+    target:   document.getElementById("goal-target").value,
+    deadline: document.getElementById("goal-deadline").value,
+  };
+
+  google.script.run
+    .withSuccessHandler(function (r) {
+      setBtnLoading(btn, false, '<i class="bi bi-plus"></i> Add Goal');
+      if (r && r.error) { showToast(r.error, "danger"); return; }
+      showToast("Goal added!", "success");
+      document.getElementById("goalForm").reset();
+      loadGoals();
+    })
+    .withFailureHandler(function (e) {
+      setBtnLoading(btn, false, '<i class="bi bi-plus"></i> Add Goal');
+      showToast("Error: " + e.message, "danger");
+    })
+    .addGoal(data);
+}
+
+function deleteGoalRow(rowIndex) {
+  if (!confirm("Delete this goal?")) return;
+  google.script.run
+    .withSuccessHandler(function (r) {
+      if (r && r.error) { showToast(r.error, "danger"); return; }
+      showToast("Goal deleted.", "success");
+      loadGoals();
+    })
+    .withFailureHandler(function (e) { showToast("Error: " + e.message, "danger"); })
+    .deleteGoal(rowIndex);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Loans
+// ═══════════════════════════════════════════════════════════════════════════
+function loadLoans() {
+  google.script.run
+    .withSuccessHandler(function (r) {
+      if (!r || r.error) { showToast(r ? r.error : "Failed to load loans", "danger"); return; }
+      _state.loans = r;
+      renderLoans();
+    })
+    .withFailureHandler(function (e) { showToast("Error: " + e.message, "danger"); })
+    .getLoans();
+}
+
+function renderLoans() {
+  document.getElementById("loansBody").innerHTML = _state.loans.length
+    ? _state.loans.map(function (l) {
+        var sc = l.status === "Returned" ? "badge-returned" : "badge-pending";
+        return "<tr>" +
+          "<td>" + escHtml(l.person) + "</td>" +
+          "<td>" + fmt(l.amount) + "</td>" +
+          "<td>" + escHtml(l.givenDate  || "—") + "</td>" +
+          "<td>" + escHtml(l.returnDate || "—") + "</td>" +
+          "<td><span class='" + sc + "'>" + escHtml(l.status) + "</span></td>" +
+          "<td>" +
+            (l.status !== "Returned"
+              ? "<button class='btn btn-sm btn-outline-success py-0 px-1 me-1' " +
+                  "onclick='markLoanReturned(" + l.rowIndex + ")' title='Mark returned'>" +
+                  "<i class='bi bi-check-lg'></i></button>"
+              : "") +
+            "<button class='btn btn-sm btn-outline-danger py-0 px-1' " +
+              "onclick='deleteLoanRow(" + l.rowIndex + ")' title='Delete'>" +
+              "<i class='bi bi-trash3'></i>" +
+            "</button>" +
+          "</td>" +
+          "</tr>";
+      }).join("")
+    : "<tr><td colspan='6' class='text-center text-muted py-3'>No loans recorded.</td></tr>";
+}
+
+function submitLoan(evt) {
+  evt.preventDefault();
+  var btn = document.getElementById("loanSubmitBtn");
+  setBtnLoading(btn, true);
+
+  var data = {
+    person:     document.getElementById("loan-person").value,
+    amount:     document.getElementById("loan-amount").value,
+    givenDate:  document.getElementById("loan-givenDate").value,
+    returnDate: document.getElementById("loan-returnDate").value,
+    status:     document.getElementById("loan-status").value,
+  };
+
+  google.script.run
+    .withSuccessHandler(function (r) {
+      setBtnLoading(btn, false, '<i class="bi bi-plus"></i> Add Loan');
+      if (r && r.error) { showToast(r.error, "danger"); return; }
+      showToast("Loan added!", "success");
+      document.getElementById("loanForm").reset();
+      loadLoans();
+    })
+    .withFailureHandler(function (e) {
+      setBtnLoading(btn, false, '<i class="bi bi-plus"></i> Add Loan');
+      showToast("Error: " + e.message, "danger");
+    })
+    .addLoan(data);
+}
+
+function markLoanReturned(rowIndex) {
+  if (!confirm("Mark this loan as Returned?")) return;
+  google.script.run
+    .withSuccessHandler(function (r) {
+      if (r && r.error) { showToast(r.error, "danger"); return; }
+      showToast("Loan marked as Returned.", "success");
+      loadLoans();
+    })
+    .withFailureHandler(function (e) { showToast("Error: " + e.message, "danger"); })
+    .updateLoanStatus(rowIndex, "Returned");
+}
+
+function deleteLoanRow(rowIndex) {
+  if (!confirm("Delete this loan record?")) return;
+  google.script.run
+    .withSuccessHandler(function (r) {
+      if (r && r.error) { showToast(r.error, "danger"); return; }
+      showToast("Loan deleted.", "success");
+      loadLoans();
+    })
+    .withFailureHandler(function (e) { showToast("Error: " + e.message, "danger"); })
+    .deleteLoan(rowIndex);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Actions tab
+// ═══════════════════════════════════════════════════════════════════════════
+function runAction(fnName, btn) {
+  var origHtml = btn.innerHTML;
+  setBtnLoading(btn, true);
+
+  google.script.run
+    .withSuccessHandler(function (r) {
+      setBtnLoading(btn, false, origHtml);
+      if (r && r.error) { showToast(r.error, "danger"); return; }
+      showToast(r && r.message ? r.message : "Done!", "success");
+      // Refresh relevant data after each action
+      if      (fnName === "runSetup")                  loadAll();
+      else if (fnName === "runGenerateMonthlySummary") loadSummary();
+      else if (fnName === "runUpdateGoals")            loadGoals();
+    })
+    .withFailureHandler(function (e) {
+      setBtnLoading(btn, false, origHtml);
+      showToast("Error: " + (e.message || e), "danger");
+    })
+    [fnName]();
+}
+</script>
+</body>
+</html>
